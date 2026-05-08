@@ -2,7 +2,7 @@
 <html lang="da">
 <head>
     <meta charset="UTF-8">
-    <title>Vedligeholdelsesmatrix - DMP Logs</title>
+    <title>Logbaseret oversigt Batteri- og kapseldrift</title>
     <style>
         body { 
             font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
@@ -10,18 +10,50 @@
             background-color: #121212; color: #e0e0e0; 
         }
         .container { 
-            max-width: 1500px; margin: 0 auto; 
+            max-width: 1600px; margin: 0 auto; 
             background: #1e1e1e; padding: 25px; 
             border-radius: 4px; border: 1px solid #333;
         }
+
+        /* --- TITLE & TOOLTIP --- */
+        .header-container { display: flex; align-items: center; gap: 10px; margin-bottom: 20px; }
+        h2 { margin: 0; }
+        
+        .help-icon {
+            display: inline-flex; justify-content: center; align-items: center;
+            width: 20px; height: 20px;
+            background: #333; border: 1px solid #555;
+            border-radius: 50%; cursor: help;
+            font-size: 0.8em; font-weight: bold; color: #aaa;
+            position: relative;
+        }
+        
+        .help-tooltip {
+            display: none;
+            position: absolute; left: 35px; top: -10px;
+            width: 450px; padding: 15px;
+            background: #2d2d2d; border: 1px solid #444;
+            color: #ccc; border-radius: 4px;
+            font-size: 0.9em; text-align: left; font-weight: normal;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.6);
+            z-index: 100; line-height: 1.5;
+        }
+
+        .help-icon:hover .help-tooltip { display: block; }
+        .help-tooltip strong { color: #fff; }
+        .help-tooltip ul { margin: 8px 0 12px; padding-left: 20px; }
+        .help-tooltip li { margin-bottom: 6px; }
+
+        /* --- CONTROLS --- */
         .controls { 
             display: grid; grid-template-columns: 1fr 1fr 1fr; 
             gap: 15px; margin-bottom: 20px; 
             background: #252526; padding: 20px; border-radius: 4px; 
         }
         .full-width { grid-column: 1 / -1; }
+        .filter-group { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
         label { font-size: 0.8em; color: #aaa; display: block; margin-bottom: 5px; }
-        input { 
+        input[type="number"], input[type="date"] { 
             width: 100%; padding: 8px; 
             background: #333; border: 1px solid #444; 
             color: #fff; box-sizing: border-box; 
@@ -29,10 +61,11 @@
         button { 
             padding: 10px; cursor: pointer; 
             background: #0078d4; color: white; 
-            border: none; font-weight: bold; 
+            border: none; font-weight: 600; 
         }
         button:disabled { background: #444; cursor: not-allowed; }
         
+        /* --- TABLE --- */
         table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 0.9em; }
         th { 
             background: #2d2d2d; text-align: left; padding: 12px; 
@@ -43,14 +76,32 @@
         td { padding: 10px; border-bottom: 1px solid #333; }
         tr:hover { background-color: #252526; }
         .status { color: #00ff41; font-family: monospace; font-size: 0.9em; margin-bottom: 10px; }
-        .date-cell { text-align: center; color: #4aa3df; font-weight: bold; }
+        .date-cell { text-align: center; color: #4aa3df; font-weight: 600; }
         .sort-indicator { font-size: 0.8em; margin-left: 5px; color: #888; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h2>Vedligeholdelsesoverblik (Matrix)</h2>
+    <div class="header-container">
+        <h2>Logbaseret oversigt Batteri- og kapseldrift</h2>
+        <div class="help-icon">
+            ?
+            <div class="help-tooltip">
+                <strong>Datahentning</strong><br>
+                Oversigten henter log-data for de valgte stationer via Miljøportalens (DMP) API og filtrerer beskrivelserne for hændelser vedrørende udstyr.<br><br>
+                
+                <strong>Beregning og logik</strong>
+                <ul>
+                    <li><strong>Skiftet logger:</strong> Dato for seneste loggerskift.</li>
+                    <li><strong>Batteriskift:</strong> Seneste batteriskift. Skjules hvis det ligger før seneste loggerskift.</li>
+                    <li><strong>Driftstid batteri:</strong> Dage siden nyeste hændelse af enten batteriskift eller loggerskift.</li>
+                    <li><strong>Kapselskift:</strong> Seneste tørremiddel-/kapselskift (kun ecolog1000). Skjules hvis det ligger før seneste loggerskift.</li>
+                    <li><strong>Driftstid kapsel:</strong> Dage siden nyeste hændelse af enten kapselskift eller loggerskift (kun ecolog1000).</li>
+                </ul>
+            </div>
+        </div>
+    </div>
     
     <div class="controls">
         <div>
@@ -59,18 +110,22 @@
         </div>
         <div>
             <label>Til Stationsnummer</label>
-            <input type="number" id="endId" value="47000000">
+            <input type="number" id="endId" value="48000000">
         </div>
         <div>
             <label>Dato Interval (Fra)</label>
             <input type="date" id="startDate">
         </div>
+        <div class="full-width filter-group">
+            <input type="checkbox" id="filterEco" onchange="renderTableBody()">
+            <label for="filterEco" style="margin-bottom: 0;">Vis kun ecolog1000 (EL1K)</label>
+        </div>
         <div class="full-width">
-            <button id="btnRun" onclick="generateMaintenanceMatrix()">Generer overblik</button>
+            <button id="btnRun" onclick="generateMaintenanceMatrix()">Hent batteri og kapsel logs</button>
         </div>
     </div>
 
-    <div id="status" class="status">Klar...</div>
+    <div id="status" class="status">Klar.</div>
 
     <table id="matrixTable">
         <thead>
@@ -78,9 +133,11 @@
                 <th onclick="sortBy('id')">ID <span id="ind-id" class="sort-indicator"></span></th>
                 <th onclick="sortBy('name')">Stationsnavn <span id="ind-name" class="sort-indicator"></span></th>
                 <th onclick="sortBy('loggerId')">Logger ID <span id="ind-loggerId" class="sort-indicator"></span></th>
-                <th style="text-align:center" onclick="sortBy('batteri')">Skiftet batteri <span id="ind-batteri" class="sort-indicator"></span></th>
-                <th style="text-align:center" onclick="sortBy('dageSidenBatteri')">Dage siden batteri <span id="ind-dageSidenBatteri" class="sort-indicator"></span></th>
-                <th style="text-align:center" onclick="sortBy('tørremiddel')">Tørremiddel skiftet <span id="ind-tørremiddel" class="sort-indicator"></span></th>
+                <th style="text-align:center" onclick="sortBy('logger')">Skiftet logger <span id="ind-logger" class="sort-indicator"></span></th>
+                <th style="text-align:center" onclick="sortBy('batteri')">Batteriskift <span id="ind-batteri" class="sort-indicator"></span></th>
+                <th style="text-align:center" onclick="sortBy('batteriDageDrift')">Driftstid batteri (dage) <span id="ind-batteriDageDrift" class="sort-indicator"></span></th>
+                <th style="text-align:center" onclick="sortBy('tørre')">Kapselskift <span id="ind-tørre" class="sort-indicator"></span></th>
+                <th style="text-align:center" onclick="sortBy('tørreDageDrift')">Driftstid kapsel (dage) <span id="ind-tørreDageDrift" class="sort-indicator"></span></th>
                 <th style="text-align:center" onclick="sortBy('tryksonde')">Renset tryksonde <span id="ind-tryksonde" class="sort-indicator"></span></th>
             </tr>
         </thead>
@@ -91,9 +148,10 @@
 
 <script>
     const columns = [
-        { key: 'batteri', searchTerms: ['batteri'] },
-        { key: 'tørremiddel', searchTerms: ['tørremiddel'] },
-        { key: 'tryksonde', searchTerms: ['tryksonde', 'renset tryk'] }
+        { key: 'batteri', searchTerms: ['skiftet batteri'] },
+        { key: 'logger', searchTerms: ['skiftet logger'] },
+        { key: 'tørre', searchTerms: ['tørre'] },
+        { key: 'tryksonde', searchTerms: ['renset tryksonde', 'renset tryk'] }
     ];
     
     let matrixData = [];
@@ -113,7 +171,6 @@
     async function generateMaintenanceMatrix() {
         const startId = parseInt(document.getElementById('startId').value);
         const endId = parseInt(document.getElementById('endId').value);
-        
         const startVal = document.getElementById('startDate').value;
         const todayVal = new Date().toISOString().split('T')[0];
         
@@ -128,7 +185,7 @@
         renderTableBody();
         
         try {
-            statusDiv.innerText = "Henter stationsliste...";
+            statusDiv.innerText = "Henter stationer...";
             const respStations = await fetch("https://vandah.miljoeportal.dk/api/stations");
             const allStations = await respStations.json();
             
@@ -139,7 +196,7 @@
                        (s.stationOwnerName || "").toLowerCase().includes('miljøstyrelsen');
             });
 
-            statusDiv.innerText = `Fundet ${relevantStations.length} stationer. Henter vedligeholdelsesdata...`;
+            statusDiv.innerText = `Scanner ${relevantStations.length} stationer...`;
 
             for (const station of relevantStations) {
                 statusDiv.innerText = `Tjekker ${station.stationId}: ${station.name}...`;
@@ -148,9 +205,11 @@
                     id: parseInt(station.stationId), 
                     name: station.name,
                     loggerId: station.loggerId || "-",
+                    logger: "",
                     batteri: "", 
-                    dageSidenBatteri: "",
-                    tørremiddel: "", 
+                    batteriDageDrift: "",
+                    tørre: "", 
+                    tørreDageDrift: "",
                     tryksonde: ""
                 };
 
@@ -161,15 +220,12 @@
                     if (respLogs.ok) {
                         const json = await respLogs.json();
                         const logs = Array.isArray(json) ? json : (json.results || []);
-
-                        const latestDates = { batteri: null, tørremiddel: null, tryksonde: null };
+                        const latestDates = { batteri: null, logger: null, tørre: null, tryksonde: null };
 
                         logs.forEach(l => {
                             const activity = (l.activityTxt || "").toLowerCase();
-                            
                             if (l.dateTime) {
                                 const currentDate = new Date(l.dateTime);
-                                
                                 columns.forEach(col => {
                                     if (col.searchTerms.some(term => activity.includes(term.toLowerCase()))) {
                                         if (!latestDates[col.key] || currentDate > latestDates[col.key]) {
@@ -180,15 +236,43 @@
                             }
                         });
 
-                        rowData.batteri = latestDates.batteri ? formatDanishDate(latestDates.batteri) : "";
-                        rowData.tørremiddel = latestDates.tørremiddel ? formatDanishDate(latestDates.tørremiddel) : "";
+                        const isEco = rowData.loggerId.startsWith("EL1K");
+
+                        if (latestDates.batteri && latestDates.logger && latestDates.batteri < latestDates.logger) {
+                            rowData.batteri = "";
+                        } else {
+                            rowData.batteri = latestDates.batteri ? formatDanishDate(latestDates.batteri) : "";
+                        }
+
+                        if (isEco) {
+                            if (latestDates.tørre && latestDates.logger && latestDates.tørre < latestDates.logger) {
+                                rowData.tørre = "";
+                            } else {
+                                rowData.tørre = latestDates.tørre ? formatDanishDate(latestDates.tørre) : "";
+                            }
+                        }
+
+                        rowData.logger = latestDates.logger ? formatDanishDate(latestDates.logger) : "";
                         rowData.tryksonde = latestDates.tryksonde ? formatDanishDate(latestDates.tryksonde) : "";
 
-                        if (latestDates.batteri) {
-                            const now = new Date();
-                            const diffTime = now.getTime() - latestDates.batteri.getTime();
-                            const diffDays = Math.floor(diffTime / (1000 * 3600 * 24));
-                            rowData.dageSidenBatteri = diffDays >= 0 ? diffDays : 0;
+                        const now = new Date();
+
+                        let effectiveBatteryDate = (latestDates.batteri && latestDates.logger) 
+                            ? (latestDates.batteri > latestDates.logger ? latestDates.batteri : latestDates.logger)
+                            : (latestDates.batteri || latestDates.logger);
+
+                        if (effectiveBatteryDate) {
+                            rowData.batteriDageDrift = Math.floor((now.getTime() - effectiveBatteryDate.getTime()) / (1000 * 3600 * 24));
+                        }
+
+                        if (isEco) {
+                            let effectiveTørreDate = (latestDates.tørre && latestDates.logger)
+                                ? (latestDates.tørre > latestDates.logger ? latestDates.tørre : latestDates.logger)
+                                : (latestDates.tørre || latestDates.logger);
+                            
+                            if (effectiveTørreDate) {
+                                rowData.tørreDageDrift = Math.floor((now.getTime() - effectiveTørreDate.getTime()) / (1000 * 3600 * 24));
+                            }
                         }
                     }
 
@@ -199,13 +283,13 @@
                     console.error(`Fejl ved ${station.stationId}:`, e);
                 }
                 
-                await new Promise(r => setTimeout(r, 40));
+                await new Promise(r => setTimeout(r, 25));
             }
             
-            statusDiv.innerText = `Færdig. Overblik genereret for ${relevantStations.length} stationer.`;
+            statusDiv.innerText = `Færdig. Behandlet ${relevantStations.length} stationer.`;
             updateSortIndicators();
         } catch (e) {
-            statusDiv.innerText = "FEJL: Kunne ikke gennemføre scanning.";
+            statusDiv.innerText = "Fejl ved hentning af data.";
             console.error(e);
         } finally {
             btn.disabled = false;
@@ -224,12 +308,12 @@
             let valA = a[key];
             let valB = b[key];
 
-            if (['batteri', 'tørremiddel', 'tryksonde'].includes(key)) {
+            if (['logger', 'batteri', 'tørre', 'tryksonde'].includes(key)) {
                 valA = parseDateForSort(valA);
                 valB = parseDateForSort(valB);
                 if (valA === 0 && valB !== 0) return 1;
                 if (valB === 0 && valA !== 0) return -1;
-            } else if (key === 'dageSidenBatteri') {
+            } else if (['batteriDageDrift', 'tørreDageDrift'].includes(key)) {
                 valA = valA === "" ? Infinity : parseInt(valA);
                 valB = valB === "" ? Infinity : parseInt(valB);
                 if (valA === Infinity && valB !== Infinity) return 1;
@@ -251,35 +335,38 @@
     function parseDateForSort(dateStr) {
         if (!dateStr) return 0;
         const parts = dateStr.split('-');
-        if (parts.length === 3) {
-            return parseInt(parts[2] + parts[1] + parts[0]);
-        }
-        return 0;
+        return parts.length === 3 ? parseInt(parts[2] + parts[1] + parts[0]) : 0;
     }
 
     function updateSortIndicators() {
-        ['id', 'name', 'loggerId', 'batteri', 'dageSidenBatteri', 'tørremiddel', 'tryksonde'].forEach(k => {
-            document.getElementById(`ind-${k}`).innerText = '';
+        ['id', 'name', 'loggerId', 'logger', 'batteri', 'batteriDageDrift', 'tørre', 'tørreDageDrift', 'tryksonde'].forEach(k => {
+            const el = document.getElementById(`ind-${k}`);
+            if (el) el.innerText = '';
         });
         const indicator = document.getElementById(`ind-${currentSort.key}`);
-        if (indicator) {
-            indicator.innerText = currentSort.asc ? '▲' : '▼';
-        }
+        if (indicator) indicator.innerText = currentSort.asc ? '(op)' : '(ned)';
     }
 
     function renderTableBody() {
         const tableBody = document.getElementById('matrixBody');
+        const showOnlyEco = document.getElementById('filterEco').checked;
         tableBody.innerHTML = "";
         
-        matrixData.forEach(row => {
+        const filteredData = showOnlyEco 
+            ? matrixData.filter(row => (row.loggerId || "").startsWith("EL1K"))
+            : matrixData;
+
+        filteredData.forEach(row => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td>${row.id}</td>
                 <td>${row.name}</td>
                 <td>${row.loggerId}</td>
+                <td class="date-cell">${row.logger}</td>
                 <td class="date-cell">${row.batteri}</td>
-                <td class="date-cell">${row.dageSidenBatteri}</td>
-                <td class="date-cell">${row.tørremiddel}</td>
+                <td class="date-cell">${row.batteriDageDrift}</td>
+                <td class="date-cell">${row.tørre}</td>
+                <td class="date-cell">${row.tørreDageDrift}</td>
                 <td class="date-cell">${row.tryksonde}</td>
             `;
             tableBody.appendChild(tr);
